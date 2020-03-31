@@ -30,28 +30,62 @@ namespace MyDogWalkingAPI.Controllers
         //GET ALL
 
         [HttpGet]
-        public async Task<IActionResult> Get()
+        public async Task<IActionResult> Get([FromQuery] string include, [FromQuery] string q)
         {
             using (SqlConnection conn = Connection)
             {
                 conn.Open();
                 using (SqlCommand cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT Id, Name, Address, NeighborhoodId, Phone FROM Owner";
+                    var includeQuery = " ";
+                    var joinQuery = "";
+                    if (include == "neighborhood")
+                    {
+                        includeQuery = " n.Name NeighborhoodName, ";
+                        joinQuery = " LEFT JOIN Neighborhood N ON o.NeighborhoodId = n.Id";
+
+                    }
+                    cmd.CommandText = $"SELECT o.Id, o.Name, o.Address, o.NeighborhoodId,{includeQuery}o.Phone FROM Owner o{joinQuery}";
+
+                    if (q != null)
+                    {
+                        cmd.CommandText += " WHERE Name LIKE @Name";
+                        cmd.Parameters.Add(new SqlParameter("@Name", "%" + q + "%"));
+                    }
+
                     SqlDataReader reader = cmd.ExecuteReader();
                     List<Owner> owners = new List<Owner>();
-
+                    Owner owner = null;
                     while (reader.Read())
                     {
-                        Owner owner = new Owner
+                        if (include == "neighborhood")
                         {
-                            Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                            Name = reader.GetString(reader.GetOrdinal("Name")),
-                            Address = reader.GetString(reader.GetOrdinal("Address")),
-                            NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
-                            Phone = reader.GetString(reader.GetOrdinal("Phone"))
+                            owner = new Owner
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Address = reader.GetString(reader.GetOrdinal("Address")),
+                                NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
+                                Phone = reader.GetString(reader.GetOrdinal("Phone")),
+                                Neighborhood = new Neighborhood()
+                                {
+                                    Id = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
+                                    Name = reader.GetString(reader.GetOrdinal("NeighborhoodName"))
+                                }
+                            };
+                        }
+                        else
+                        {
+                            owner = new Owner
+                            {
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                Name = reader.GetString(reader.GetOrdinal("Name")),
+                                Address = reader.GetString(reader.GetOrdinal("Address")),
+                                NeighborhoodId = reader.GetInt32(reader.GetOrdinal("NeighborhoodId")),
+                                Phone = reader.GetString(reader.GetOrdinal("Phone"))
+                            };
 
-                        };
+                        }
 
                         owners.Add(owner);
                     }
